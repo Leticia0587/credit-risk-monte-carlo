@@ -26,18 +26,12 @@ Responder essa pergunta é essencial para compreender o comportamento de risco d
 
 # Dataset
 
-**Fonte:** Kaggle  
+*  **Fonte:** Kaggle  
+*  **Nome:** Lending Club Loan Dataset  
+*  **Link:** https://www.kaggle.com/datasets/wordsforthewise/lending-club
 
-**Nome:** Lending Club Loan Dataset  
+*  **Contexto:** O dataset contém informações históricas de empréstimos concedidos por uma plataforma de crédito peer-to-peer, incluindo características financeiras dos contratos, informações de clientes e status dos empréstimos.
 
-**Link:** https://www.kaggle.com/datasets/wordsforthewise/lending-club
-
-**Contexto**
-
-O dataset contém informações históricas de empréstimos concedidos por uma plataforma de crédito peer-to-peer, incluindo características financeiras dos contratos, informações de clientes e status dos empréstimos.
-
-
-O dataset contém milhares de contratos de empréstimo e diversas variáveis financeiras e comportamentais.
 
 ---
 
@@ -60,7 +54,7 @@ Especificamente, o projeto busca:
 
 O projeto foi organizado em três etapas principais.
 
-## 1 — Análise Exploratória de Dados
+## 1. Análise Exploratória de Dados
 
 Primeiramente foi realizada uma exploração inicial dos dados para compreender sua estrutura e comportamento.
 
@@ -76,7 +70,7 @@ Essa etapa é fundamental para entender o comportamento da carteira antes de qua
 
 ---
 
-## 2 — Feature Engineering
+## 2. Feature Engineering
 
 Na segunda etapa foram realizadas transformações para tornar os dados mais adequados para análise quantitativa.
 
@@ -91,7 +85,7 @@ Essa etapa permite transformar dados brutos em **variáveis analiticamente útei
 
 ---
 
-## 3 — Simulação de Risco de Crédito
+## 3. Simulação de Risco de Crédito
 
 A etapa final consiste na simulação de perdas da carteira utilizando **Monte Carlo Simulation**.
 
