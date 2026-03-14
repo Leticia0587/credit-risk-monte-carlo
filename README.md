@@ -30,8 +30,7 @@ Responder essa pergunta é essencial para compreender o comportamento de risco d
 
 **Nome:** Lending Club Loan Dataset  
 
-**Link:**  
-https://www.kaggle.com/datasets/wordsforthewise/lending-club
+**Link:** https://www.kaggle.com/datasets/wordsforthewise/lending-club
 
 **Contexto**
 
