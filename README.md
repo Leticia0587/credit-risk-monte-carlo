@@ -1,174 +1,192 @@
-# Credit Risk Monte Carlo 
+# Simulação Monte Carlo Risco de Crédito de Portfólio
 
-Em instituições financeiras, compreender o comportamento de perdas de uma carteira de crédito é essencial para a gestão de risco e definição de capital econômico.
-
-Este projeto simula o risco de inadimplência de uma carteira de empréstimos utilizando **Monte Carlo Simulation**, permitindo estimar perdas potenciais e métricas clássicas utilizadas em gestão de risco financeiro.
-
-A análise considera os três componentes fundamentais do risco de crédito:
-
-- **Probability of Default (PD)** — probabilidade de inadimplência  
-- **Loss Given Default (LGD)** — percentual de perda em caso de default  
-- **Exposure at Default (EAD)** — exposição financeira no momento do default  
-
-A perda associada a cada contrato é modelada pela relação:
-
-Loss = Default × LGD × EAD
+Modelo quantitativo de risco de crédito que estima a distribuição de perdas de uma carteira via simulação Monte Carlo combinando regressão logística para PD, LGD segmentada por grade e o modelo de Vasicek one-factor para capturar correlação de defaults.
 
 ---
 
-# Pergunta do Projeto
+## Resumo Executivo
 
-**Qual a perda esperada e o Value at Risk (VaR) de uma carteira de crédito considerando a incerteza nas taxas de default e na severidade da perda?**
+Instituições financeiras precisam manter capital para cobrir perdas inesperadas aquelas além da perda média (Expected Loss) que as provisões já cobrem. Este projeto constrói um modelo de risco de crédito de portfólio que estima a distribuição completa de perdas, permitindo calcular **Credit VaR**, **Expected Shortfall** e **Capital Econômico** em condições normais e sob estresse macroeconômico.
 
-Responder essa pergunta é essencial para compreender o comportamento de risco de uma carteira de crédito e avaliar possíveis cenários adversos.
-
----
-
-# Dataset
-
-*  **Fonte:** Kaggle  
-*  **Nome:** Lending Club Loan Dataset  
-*  **Link:** https://www.kaggle.com/datasets/wordsforthewise/lending-club
-
-*  **Contexto:** O dataset contém informações históricas de empréstimos concedidos por uma plataforma de crédito peer-to-peer, incluindo características financeiras dos contratos, informações de clientes e status dos empréstimos.
-
+O modelo segue o mesmo arcabouço conceitual do **Basileia II IRB (Internal Ratings-Based approach)** e do **IFRS 9 ECL (Expected Credit Loss)** .
 
 ---
 
-# Objetivo do Projeto
+## Problema de Negócio
 
-O objetivo deste projeto é reproduzir, de forma simplificada, uma abordagem utilizada em **modelagem de risco de crédito de portfólio**, utilizando simulação estatística para estimar perdas potenciais.
+> *"Dada uma carteira de ~600 mil empréstimos não garantidos, qual a probabilidade de as perdas ultrapassarem um determinado nível? Quanto capital é necessário para permanecer solvente com 99% de confiança mesmo em uma recessão?"*
 
-Especificamente, o projeto busca:
-
-- compreender a estrutura dos dados de crédito
-- realizar **análise exploratória estatística**
-- aplicar **feature engineering em variáveis financeiras**
-- estimar componentes de risco da carteira
-- simular cenários de inadimplência utilizando **Monte Carlo**
-- calcular métricas clássicas de risco financeiro
+Essa é uma das perguntas centrais da gestão de risco bancário, diretamente ligada aos requisitos de capital regulatório (BACEN, Basileia III) e ao stress testing interno (ICAAP).
 
 ---
 
-# Estrutura Analítica do Projeto
+## Dataset
 
-O projeto foi organizado em três etapas principais.
+| Item | Detalhe |
+|------|---------|
+| Fonte | Kaggle [Lending Club Loan Dataset](https://www.kaggle.com/datasets/wordsforthewise/lending-club) |
+| Registros brutos | ~2,26 milhões |
+| Após deduplicação | ~928 mil |
+| Após filtro de maturidade | ~598 mil contratos maduros |
+| Exposição total | ~R$ 8,9 bilhões |
 
-## 1. Análise Exploratória de Dados
-
-Primeiramente foi realizada uma exploração inicial dos dados para compreender sua estrutura e comportamento.
-
-Foram analisados:
-
-- tipos de variáveis
-- distribuição das variáveis numéricas
-- presença de valores ausentes
-- padrões de comportamento financeiro
-- correlação entre variáveis relevantes
-
-Essa etapa é fundamental para entender o comportamento da carteira antes de qualquer modelagem.
+Apenas **contratos maduros** (Fully Paid, Charged Off, Default) são utilizados empréstimos ativos têm desfecho desconhecido e enviésariam as estimativas de PD.
 
 ---
 
-## 2. Feature Engineering
+## Metodologia
 
-Na segunda etapa foram realizadas transformações para tornar os dados mais adequados para análise quantitativa.
+### Componente 1 Modelo de PD (Probabilidade de Default)
 
-Entre as principais transformações aplicadas:
+**Regressão logística** treinada com quatro features:
 
-- conversão de variáveis categóricas relevantes
-- transformação de campos textuais em valores numéricos (ex: prazo do empréstimo)
-- padronização de variáveis financeiras
-- criação de variáveis derivadas úteis para análise de risco
+| Feature | Justificativa |
+|---------|---------------|
+| `fico_score` | Proxy da qualidade de crédito do tomador |
+| `int_rate` | Sinal de precificação ajustado ao risco |
+| `term` | Empréstimos de prazo maior apresentam maior PD observada |
+| `grade_num` | Classificação ordinal de risco do originador |
 
-Essa etapa permite transformar dados brutos em **variáveis analiticamente úteis para modelagem e simulação**.
+Modelo validado com as métricas padrão da indústria:
 
----
+| Métrica | Referência | Resultado |
+|---------|-----------|-----------|
+| AUC | > 0,65 | ✓ |
+| Gini | > 0,30 | ✓ |
+| KS | > 0,20 | ✓ |
 
-## 3. Simulação de Risco de Crédito
+### Componente 2 Modelo de LGD (Loss Given Default)
 
-A etapa final consiste na simulação de perdas da carteira utilizando **Monte Carlo Simulation**.
+**Distribuição Beta** parametrizada por grade grades com maior risco de default também apresentam menores taxas de recuperação (maior LGD).
 
-O processo seguido foi:
+| Grade | LGD Média | Justificativa |
+|-------|-----------|---------------|
+| A | 35% | Tomadores de maior qualidade, melhor recuperação |
+| C | 45% | Risco moderado |
+| G | 65% | Subprime, baixa recuperação |
 
-1. Para cada contrato da carteira, utilizar sua **probabilidade de default (PD)**.
-2. Simular eventos de inadimplência utilizando variáveis aleatórias.
-3. Calcular a perda de cada contrato considerando **LGD e EAD**.
-4. Agregar as perdas individuais para obter a perda total da carteira.
-5. Repetir o processo milhares de vezes para gerar uma **distribuição de perdas**.
+A LGD é **re-amostrada a cada cenário da simulação** para capturar a incerteza na severidade da perda.
 
-Essa abordagem permite estimar o comportamento probabilístico das perdas do portfólio.
+### Componente 3 EAD (Exposure at Default)
 
----
+Valor do empréstimo utilizado como proxy de EAD simplificação padrão para dados históricos de crédito ao consumidor.
 
-# Métricas de Risco Calculadas
+### Componente 4 Simulação Monte Carlo
 
-A simulação gerou as seguintes métricas de risco para a carteira analisada.
+Dois modelos implementados e comparados:
 
-| Métrica | Valor |
-|------|------|
-| Exposição total da carteira | 8.897.981.225 |
-| Expected Loss | 1.100.174.172 |
-| Credit VaR 95% | 1.104.781.458 |
-| Credit VaR 99% | 1.106.689.299 |
-| Expected Shortfall 99% | 1.107.628.501 |
+#### Modelo A Independência (Benchmark)
+Cada contrato entra em default de forma independente via Bernoulli(PD_i). Com 598 mil contratos, o Teorema Central do Limite força VaR ≈ EL isso **subestima o risco de cauda** e é apresentado como benchmark pedagógico.
 
----
+#### Modelo B Vasicek One-Factor (Recomendado)
+Baseado em Vasicek (1987) e no arcabouço IRB de Basileia II:
 
-# Resposta à Pergunta do Projeto
+$$A_i = \sqrt{\rho_i} \cdot Z + \sqrt{1 - \rho_i} \cdot \varepsilon_i$$
 
-A simulação Monte Carlo permitiu estimar o comportamento das perdas da carteira considerando a incerteza associada às probabilidades de default e à severidade da perda.
+- **Z** ~ N(0,1): fator sistêmico (estado da economia) compartilhado por todos os contratos
+- **εᵢ** ~ N(0,1): fator idiossincrático independente por contrato
+- **ρ**: correlação de ativo (parâmetro regulatório de Basileia, varia por grade)
 
-Os resultados indicam que:
+O contrato i entra em default quando $A_i < \Phi^{-1}(PD_i)$.
 
-- **Perda Esperada (Expected Loss):** 1.100.174.172  
-- **Value at Risk (VaR) 95%:** 1.104.781.458  
-- **Value at Risk (VaR) 99%:** 1.106.689.299  
-- **Expected Shortfall 99%:** 1.107.628.501  
-
-### Interpretação
-
-A perda média esperada da carteira é de aproximadamente **1,1 bilhão**, considerando o comportamento médio dos contratos simulados.
-
-Entretanto, em cenários adversos:
-
-- Existe **5% de probabilidade** de a perda ultrapassar aproximadamente **1,10 bilhão**.
-- Existe **1% de probabilidade** de a perda ultrapassar aproximadamente **1,106 bilhão**.
-
-O **Expected Shortfall** indica que, nos piores 1% dos cenários simulados, a perda média da carteira pode atingir aproximadamente **1,107 bilhão**.
-
-Essas métricas permitem compreender não apenas a perda média da carteira, mas também **o risco associado a cenários extremos**, informação fundamental para gestão de risco e definição de capital econômico em instituições financeiras.
+Quando Z << 0 (recessão), todos os retornos de ativos caem simultaneamente → defaults correlacionados → cauda pesada na distribuição de perdas.
 
 ---
 
-# Distribuição de Perdas
+## Principais Resultados
 
-A distribuição abaixo representa os resultados obtidos na simulação Monte Carlo.
+### Validação do Modelo de PD
 
-![Distribuição de Perdas](images/loss_distribution.png)
+A regressão logística captura corretamente a relação monotônica entre grade de crédito e probabilidade de default verificação necessária antes de qualquer simulação.
 
-A maior parte dos cenários concentra-se próxima à perda esperada da carteira, enquanto cenários extremos apresentam perdas superiores, capturadas pelas métricas de VaR e Expected Shortfall.
+### Comparação das Distribuições de Perda
+
+| Métrica | Independência | Vasicek |
+|---------|--------------|---------|
+| EL (analítica) | ~R$ 1,1 bi | ~R$ 1,1 bi |
+| VaR 95% | EL + buffer pequeno | EL + **buffer maior** |
+| VaR 99% | EL + buffer mínimo | EL + **buffer significativo** |
+| Capital Econômico | Subestimado | Realista |
+
+O modelo Vasicek produz uma distribuição assimétrica com cauda direita mais pesada consistente com a evidência empírica de crises de crédito.
+
+### Stress Testing
+
+| Cenário | Fator Sistêmico Z | Interpretação |
+|---------|-------------------|---------------|
+| Base | 0,0 | Economia em estado normal |
+| Adverso | −1,0 | Contração moderada |
+| Severo | −2,0 | Recessão (~evento de 1 em 20 anos) |
+| Extremo | −3,0 | Crise sistêmica (~evento de 1 em 740 anos) |
+
+Os resultados de stress mostram como o capital necessário escala em condições macroeconômicas adversas insumo direto para os relatórios de ICAAP.
 
 ---
 
-# Tecnologias Utilizadas
+## Estrutura do Projeto
 
-O projeto foi desenvolvido utilizando ferramentas amplamente utilizadas em ciência de dados e análise quantitativa.
-
-- Python
-- Pandas
-- NumPy
-- Matplotlib
-- Seaborn
-- Jupyter Notebook
+```
+credit-risk-monte-carlo/
+├── notebooks/
+│   ├── 01_eda.ipynb                  # Análise exploratória + qualidade dos dados
+│   ├── 02_feature_engineering.ipynb  # Modelo de PD + LGD + construção da carteira
+│   └── 03_monte_carlo.ipynb          # Simulação + VaR + stress testing
+├── data/
+│   ├── raw/                          # Dados de origem (não versionados)
+│   └── processed/                    # Arquivos parquet intermediários + parâmetros LGD
+├── images/                           # Gráficos exportados
+├── requirements.txt
+└── README.md
+```
 
 ---
 
-# Conclusão
+## Tecnologias Utilizadas
 
-Este projeto demonstra como técnicas de **simulação estatística** podem ser utilizadas para analisar o risco de uma carteira de crédito.
+| Ferramenta | Finalidade |
+|------------|-----------|
+| Python 3.10+ | Linguagem principal |
+| pandas / numpy | Manipulação de dados |
+| scikit-learn | Regressão logística e validação do modelo |
+| scipy | Distribuição Beta e testes estatísticos |
+| matplotlib / seaborn | Visualização |
+| Jupyter Notebook | Desenvolvimento interativo |
 
-Ao combinar análise exploratória, engenharia de variáveis e simulação Monte Carlo, é possível estimar não apenas a perda média esperada, mas também cenários extremos de risco.
+---
 
-Além da implementação técnica, o projeto demonstra **capacidade analítica e compreensão dos fundamentos quantitativos do risco de crédito**, competências essenciais em projetos reais de dados no setor financeiro.
+## Como Executar
 
+```bash
+# 1. Clonar o repositório
+git clone <repo-url>
+cd credit-risk-monte-carlo
+
+# 2. Instalar dependências
+pip install -r requirements.txt
+
+# 3. Baixar o dataset
+# Colocar loan_default.csv em data/raw/
+# Fonte: https://www.kaggle.com/datasets/wordsforthewise/lending-club
+
+# 4. Executar os notebooks em ordem
+jupyter notebook notebooks/01_eda.ipynb
+jupyter notebook notebooks/02_feature_engineering.ipynb
+jupyter notebook notebooks/03_monte_carlo.ipynb
+```
+
+---
+
+## Referências Teóricas
+
+- Vasicek, O. (1987). *Probability of Loss on Loan Portfolio*. KMV Corporation.
+- Gordy, M. (2003). *A Risk-Factor Model Foundation for Ratings-Based Bank Capital Rules*. Journal of Financial Intermediation.
+- Basel Committee on Banking Supervision. *International Convergence of Capital Measurement and Capital Standards* (Basileia II, 2004).
+- McNeil, A., Frey, R., Embrechts, P. (2015). *Quantitative Risk Management*. Princeton University Press.
+
+---
+
+## Autora
+
+**Leticia de Araujo**
+Engenheira de Dados em transição para Ciência de Dados
+[GitHub](https://github.com/Leticia0587)
